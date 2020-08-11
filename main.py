@@ -2,6 +2,7 @@ from opensimplex import OpenSimplex
 from PIL import Image
 import numpy as np
 import math
+import struct
 
 SEED = 3
 
@@ -47,10 +48,17 @@ def go():
             z = sum(z_factors) / (sum_weights + gradient_weight)
             z *= math.sin(sq_grad * half_pi)
             z *= pow(sq_grad, 2.0) + 0.5
-            arr[x, y] = bound(z) * 255.0
+            arr[x, y] = int(bound(z) * 64.0)
 
+    save_altitude(arr)
     im = Image.fromarray(arr)
     im.show()
+
+
+def save_altitude(array):
+    with open('altitude.bin', 'wb') as f:
+        for value in np.nditer(array):
+            f.write(struct.pack('>H', int(value)))
 
 
 if __name__ == '__main__':

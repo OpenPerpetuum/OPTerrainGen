@@ -4,17 +4,19 @@ import numpy as np
 import math
 import struct
 
-SEED = 3
+SEED = 6
 
 half_pi = math.pi / 2.0
 
 w = 512
 h = 512
 
-scales = (155, 50, 20, 10, 5, 2)
-weights = (155, 50, 20, 10, 5, 2)
+scales = (200, 125, 75, 45, 35, 25, 15, 7)
+weights = (200, 150, 100, 50, 25, 15, 7, 3)
 
-gradient_weight = 100
+gradient_weight = 200
+
+voronoi_weight = 200
 
 plex = OpenSimplex(seed=SEED)
 
@@ -27,12 +29,20 @@ def square_gradient(x, y, width, height):
     return min(vx, vy)
 
 
+def dist(pt_a, pt_b, n_dimensions=2):
+    sum_sqrs = 0
+    for i in range(n_dimensions):
+        sum_sqrs += math.pow(pt_a[i] - pt_b[i], 2)
+    return math.sqrt(sum_sqrs)
+
+
 def bound(x, lower=0.0, upper=1.0):
     return min(max(x, lower), upper)
 
 
 def go():
     arr = np.ndarray(shape=(w, h), dtype=np.int32)
+    region_z = voronoi_regions(arr)
     for x in range(w):
         for y in range(h):
             z_factors = []
@@ -45,13 +55,38 @@ def go():
             sq_grad = square_gradient(x, y, w, h)
             sin = math.sin(sq_grad * half_pi)
             z_factors.append(sin * gradient_weight)
-            z = sum(z_factors) / (sum_weights + gradient_weight)
+            z_factors.append(region_z[x, y] * voronoi_weight)
+            z = sum(z_factors) / (sum_weights + gradient_weight + voronoi_weight)
             z *= math.sin(sq_grad * half_pi)
             z *= pow(sq_grad, 2.0) + 0.5
             arr[x, y] = int(bound(z) * 1023.0)
     im = Image.fromarray(arr)
     save_altitude(arr)
     im.show()
+
+
+
+def generate_poisson_pts(num_pts=10, margin=(w / 10)):
+    poi_pts = np.random.poisson(num_pts)
+    x = margin + np.random.uniform(0, 1, poi_pts) * w - (2 * margin)
+    y = margin + np.random.uniform(0, 1, poi_pts) * h - (2 * margin)
+    return np.stack((x, y), axis=1)
+
+
+def voronoi_regions(array):
+    voronoi_z = np.ndarray(shape=array.shape, dtype=np.float)
+    cell_origins = generate_poisson_pts(25)
+    for x in range(w):
+        for y in range(h):
+            min_dist = w * h
+            closest_cell = None
+            for cell_pt in cell_origins:
+                d = dist((x, y), cell_pt)
+                if d <= min_dist:
+                    min_dist = d
+                    closest_cell = cell_pt
+            voronoi_z[x, y] = square_gradient(closest_cell[0], closest_cell[1], w, h)
+    return voronoi_z
 
 
 def compute_slope(x, y, width, height, array):

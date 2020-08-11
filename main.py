@@ -48,17 +48,10 @@ def go():
             z = sum(z_factors) / (sum_weights + gradient_weight)
             z *= math.sin(sq_grad * half_pi)
             z *= pow(sq_grad, 2.0) + 0.5
-            arr[x, y] = int(bound(z) * 255.0)
+            arr[x, y] = int(bound(z) * 1023.0)
     im = Image.fromarray(arr)
     save_altitude(arr)
     im.show()
-
-
-def convert_to_altitude(array):
-    for x in range(w):
-        for y in range(h):
-            array[x, y] = int(array[x, y]) << 5
-    return array
 
 
 def compute_slope(x, y, width, height, array):

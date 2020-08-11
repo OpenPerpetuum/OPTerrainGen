@@ -1,8 +1,9 @@
 from opensimplex import OpenSimplex
 from PIL import Image
+from utils import utils
+from altitude import altitude
 import numpy as np
 import math
-import struct
 
 SEED = 6
 
@@ -14,32 +15,13 @@ h = 512
 scales = (200, 125, 75, 45, 35, 25, 15, 7)
 weights = (200, 150, 100, 50, 25, 15, 7, 3)
 
-gradient_weight = 200
+gradient_weight = 3
+voronoi_weight = 1
+noise_weight = 3
 
-voronoi_weight = 200
-
-smooth_weight = 100
+num_voronoi_pts = utils.bound((w * h) / 10000, 1, 100)
 
 plex = OpenSimplex(seed=SEED)
-
-
-def square_gradient(x, y, width, height):
-    hw = width / 2.0
-    hh = height / 2.0
-    vx = (hw - abs(hw - x)) / hw
-    vy = (hh - abs(hh - y)) / hh
-    return min(vx, vy)
-
-
-def dist(pt_a, pt_b, n_dimensions=2):
-    sum_sqrs = 0
-    for i in range(n_dimensions):
-        sum_sqrs += math.pow(pt_a[i] - pt_b[i], 2)
-    return math.sqrt(sum_sqrs)
-
-
-def bound(x, lower=0.0, upper=1.0):
-    return min(max(x, lower), upper)
 
 
 def go():
@@ -54,27 +36,78 @@ def go():
                 weight = weights[i]
                 noise_val = plex.noise2d(x / scale, y / scale)
                 z_factors.append(noise_val * weight)
-            sq_grad = square_gradient(x, y, w, h)
+            sq_grad = utils.square_gradient(x, y, w, h)
             sin = math.sin(sq_grad * half_pi)
             z_factors.append(sin * gradient_weight)
             z_factors.append(region_z[x, y] * voronoi_weight)
             z = sum(z_factors) / (sum_weights + gradient_weight + voronoi_weight)
             z *= math.sin(sq_grad * half_pi)
             z *= pow(sq_grad, 2.0) + 0.5
-            arr[x, y] = int(bound(z) * 1023.0)
+            arr[x, y] = int(utils.bound(z) * 1023.0)
 
-    arr = smooth(arr)
+    arr = smooth(arr, 10)
     im = Image.fromarray(arr)
-    save_altitude(arr)
+    altitude.save_altitude(arr, w, h)
     im.show()
 
 
+def pipeline():
+    arr = np.ndarray(shape=(w, h), dtype=np.int32)
+    plataeus = voronoi_regions(arr)
+    smoothed_plataeus = smooth(plataeus, 6)
+    noise_terrain = noise()
+    island_terrain = island_gradient()
+    for x in range(w):
+        for y in range(h):
+            z_factors = []
+            sum_weights = gradient_weight + voronoi_weight + noise_weight
+            z_factors.append(smoothed_plataeus[x, y] * voronoi_weight)
+            z_factors.append(noise_terrain[x, y] * noise_weight)
+            z_factors.append(island_terrain[x, y] * gradient_weight)
+            z = sum(z_factors) / (sum_weights)
+            arr[x, y] = int(utils.bound(z) * 512.0)
+    im = Image.fromarray(arr)
+    altitude.save_altitude(arr, w, h)
+    im.show()
+
+
+def noise():
+    arr = np.ndarray(shape=(w, h), dtype=np.float)
+    for x in range(w):
+        for y in range(h):
+            z_factors = []
+            sum_weights = sum(weights)
+            for i in range(len(scales)):
+                scale = scales[i]
+                weight = weights[i]
+                noise_val = plex.noise2d(x / scale, y / scale)
+                z_factors.append(noise_val * weight)
+            z = sum(z_factors) / (sum_weights)
+            arr[x, y] = utils.bound(z)
+    return arr
+
+
+def island_gradient():
+    arr = np.ndarray(shape=(w, h), dtype=np.float)
+    for x in range(w):
+        for y in range(h):
+            z_factors = []
+            sq_grad = utils.square_gradient(x, y, w, h)
+            sin = math.sin(sq_grad * half_pi)
+            power = pow(sq_grad, 2.0) + 0.5
+            z_factors.append(sin)
+            z_factors.append(power)
+            z = sum(z_factors) / len(z_factors)
+            arr[x, y] = utils.bound(z)
+    return arr
+
+
 def smooth(array, radius=2):
-    smoothed = np.ndarray(shape=array.shape, dtype=array.dtype)
+    smoothed = np.ndarray(shape=array.shape, dtype=np.float)
     for x in range(w):
         for y in range(h):
             neighbors = manhattan_neighborhood(x, y, w, h, radius)
-            smoothed[x, y] = int(average_list(get_zs(array, neighbors)))
+            smoothed[x, y] = average_list(get_zs(array, neighbors))
     return smoothed
 
 
@@ -114,43 +147,19 @@ def generate_poisson_pts(num_pts=10, margin=(w / 10)):
 
 def voronoi_regions(array):
     voronoi_z = np.ndarray(shape=array.shape, dtype=np.float)
-    cell_origins = generate_poisson_pts(25)
+    cell_origins = generate_poisson_pts(num_voronoi_pts)
     for x in range(w):
         for y in range(h):
             min_dist = w * h
             closest_cell = None
             for cell_pt in cell_origins:
-                d = dist((x, y), cell_pt)
+                d = utils.dist((x, y), cell_pt)
                 if d <= min_dist:
                     min_dist = d
                     closest_cell = cell_pt
-            voronoi_z[x, y] = square_gradient(closest_cell[0], closest_cell[1], w, h)
+            voronoi_z[x, y] = utils.square_gradient(closest_cell[0], closest_cell[1], w, h)
     return voronoi_z
 
 
-def compute_slope(x, y, width, height, array):
-    x0 = bound((x + 1), 0, width - 1)
-    y0 = bound((y + 1), 0, height - 1)
-    a, b, c, d = array[x, y], array[x0, y], array[x0, y0], array[x, y0]
-    e = (a + b) >> 1
-    f = (b + c) >> 1
-    g = (c + d) >> 1
-    h = (d + e) >> 1
-    i = (a + b + c + d) >> 2
-    slope_byte = abs(i - a) + abs(i - b) + abs(i - c) + abs(i - d) + abs(i - e) + abs(i - f) + abs(i - g) + abs(i - h)
-    slope_byte *= 2
-    return int(bound(slope_byte, 0, 255))
-
-
-def save_altitude(array):
-    with open('altitude.bin', 'wb') as f:
-        for x in range(w):
-            for y in range(h):
-                alt = int(array[x, y]) << 5
-                slope = compute_slope(x, y, w, h, array)
-                data = alt | slope
-                f.write(struct.pack('<H', int(data)))
-
-
 if __name__ == '__main__':
-    go()
+    pipeline()

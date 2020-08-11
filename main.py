@@ -18,6 +18,8 @@ gradient_weight = 200
 
 voronoi_weight = 200
 
+smooth_weight = 100
+
 plex = OpenSimplex(seed=SEED)
 
 
@@ -60,10 +62,47 @@ def go():
             z *= math.sin(sq_grad * half_pi)
             z *= pow(sq_grad, 2.0) + 0.5
             arr[x, y] = int(bound(z) * 1023.0)
+
+    arr = smooth(arr)
     im = Image.fromarray(arr)
     save_altitude(arr)
     im.show()
 
+
+def smooth(array, radius=2):
+    smoothed = np.ndarray(shape=array.shape, dtype=array.dtype)
+    for x in range(w):
+        for y in range(h):
+            neighbors = manhattan_neighborhood(x, y, w, h, radius)
+            smoothed[x, y] = int(average_list(get_zs(array, neighbors)))
+    return smoothed
+
+
+def manhattan_neighborhood(x, y, width, height, radius=1):
+    neighbors = set()
+    for i in range(-radius, radius + 1):
+        x_coord = x + i
+        if x_coord < 0 or x_coord >= width:
+            break
+        for j in range(-radius, radius + 1):
+            y_coord = y + j
+            if y_coord < 0 or y_coord >= height:
+                break
+            neighbors.add((x_coord, y_coord))
+    return neighbors
+
+
+def get_zs(array, coords):
+    zs = []
+    for pt in coords:
+        zs.append(array[pt])
+    return zs
+
+
+def average_list(values):
+    if len(values) < 1:
+        return 0
+    return sum(values) / len(values)
 
 
 def generate_poisson_pts(num_pts=10, margin=(w / 10)):

@@ -14,9 +14,6 @@ half_pi = math.pi / 2.0
 w = 512
 h = 512
 
-# scales = (35, 25, 15, 7, 3, 1)
-# weights = (25, 15, 7, 3, 2, 1)
-
 scales = (200, 125, 75, 45, 35, 25, 15, 7, 3, 1)
 weights = (200, 150, 100, 50, 25, 15, 7, 3, 2, 1)
 
@@ -205,6 +202,10 @@ def do_voronoi_at(x, y, cells, func=height_from_gradient):
     if closest_cell is None:
         closest_cell = (x, y)
     return func(closest_cell)
+
+
+
+
 
 
 if __name__ == '__main__':

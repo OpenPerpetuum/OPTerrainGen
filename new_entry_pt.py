@@ -9,19 +9,20 @@ from altitude import altitude
 
 
 def test_new_pipeline():
-    w = 512
-    h = 512
+    w = 256
+    h = 256
     SEED = 3
+    ALT_SCALE = 200
+    WATER_LEVEL = 0.1
 
-    gradient_weight = 5
-    voronoi_weight = 4
-    noise_weight = 6
-
+    gradient_weight = 2.5
+    voronoi_weight = 4.0
+    noise_weight = 4.0
 
     grad = Gradient(w, h)
     noise = Noise(w, h)
-    smooth = Smooth(w, h)
-    voro = Voronoi(w, h, 25, 10)
+    smooth = Smooth(w, h, 9)
+    voro = Voronoi(w, h, 25, 15)
 
     def height_from_gradient(pt):
         return grad.do_filter_at(pt[0], pt[1])
@@ -34,7 +35,12 @@ def test_new_pipeline():
         n = height_from_noise(pt)
         return (g + n) / 2.0
 
-    voro.set_height_func(height_from_average)
+    def height_from_weighted(pt, gw=3.0, nw=2.0):
+        g = height_from_gradient(pt) * gw
+        n = height_from_noise(pt) * nw
+        return (g + n) / (gw + nw)
+
+    voro.set_height_func(height_from_weighted)
 
     zs = np.ndarray(shape=(w, h), dtype=np.float)
 
@@ -43,17 +49,17 @@ def test_new_pipeline():
 
     for x in range(w):
         for y in range(h):
-            g = grad.do_filter_at(x, y)
+            g = grad.do_filter_at(x, y) * gradient_weight
             n = noise.do_filter_at(x, y) * noise_weight
             v = smoothed_plataeus[x, y] * voronoi_weight
-            z = (n + v) / (noise_weight + voronoi_weight)
-            z *= g
+            z = (n + v + g) * g + WATER_LEVEL
+            z = max(z, 0)
             zs[x, y] = z
 
     arr = utils.scale_to_bounds(zs, 0.0, 255.0).astype(np.int32)
     im = Image.fromarray(arr)
-    # arr = utils.scale_to_bounds(zs, 0.0, ALT_SCALE).astype(np.int32)
-    # altitude.save_altitude(arr, w, h)
+    arr = utils.scale_to_bounds(zs, 0.0, ALT_SCALE).astype(np.int32)
+    altitude.save_all_layers(arr, w, h, 55)
     im.show()
 
 

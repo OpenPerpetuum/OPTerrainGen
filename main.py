@@ -49,7 +49,7 @@ def _old():
 
     arr = smooth(arr, 10)
     im = Image.fromarray(arr)
-    altitude.save_altitude(arr, w, h)
+    altitude.save_altitude(arr, w, h, 69)
     im.show()
 
 
@@ -58,9 +58,9 @@ def pipeline():
     grad = smooth(island_gradient(), 5)
     noi = noise()
     plataeus = voronoi_regions(w, h, num_voronoi_pts)
-    smoothed_plataeus = smooth(plataeus, 4)
-    for i in range(1):
-        smoothed_plataeus = smooth(smoothed_plataeus, 3)
+    smoothed_plataeus = smooth(plataeus, 2)
+    # for i in range(1):
+    #     smoothed_plataeus = smooth(smoothed_plataeus, 3)
     for x in range(w):
         for y in range(h):
             g = grad[x, y]
@@ -70,11 +70,12 @@ def pipeline():
             z *= g
             zs[x, y] = z
 
-    arr = scale_to_bounds(zs, 0.0, 255.0).astype(np.int32)
-    im = Image.fromarray(arr)
+    # arr = scale_to_bounds(zs, 0.0, 255.0).astype(np.int32)
+    # im = Image.fromarray(arr)
     arr = scale_to_bounds(zs, 0.0, ALT_SCALE).astype(np.int32)
-    altitude.save_altitude(arr, w, h)
-    im.show()
+    altitude.save_all_layers(arr, w, h, 56)
+    # altitude.save_altitude(arr, w, h, 56, )
+    # im.show()
 
 
 def noise():

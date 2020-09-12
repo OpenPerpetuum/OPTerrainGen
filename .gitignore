@@ -67,3 +67,5 @@ media/
 venv/
 
 .idea/
+
+*.bin

@@ -6,7 +6,8 @@ from filters.filter import CachedFilter
 
 class Gradient(CachedFilter):
 
-    def __init__(self, w, h):
+    def __init__(self, w, h, margin=2):
+        self.margin = margin
         super(Gradient, self).__init__(w, h)
         self.gradient = self._generate_gradient(w, h)
 

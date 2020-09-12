@@ -6,8 +6,8 @@ from filters.filter import Filter
 
 class Smooth(Filter):
 
-    def __init__(self, w, h):
-        self.sigma = [3, 3]
+    def __init__(self, w, h, radius):
+        self.sigma = [radius, radius]
         super(Smooth, self).__init__(w, h)
 
     def do_filter(self, array):

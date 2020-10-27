@@ -8,19 +8,20 @@ from utils import utils
 from altitude import altitude
 
 
-def test_new_pipeline():
+def test_new_pipeline(island_num):
     w = 256
     h = 256
-    SEED = 3
+    SEED = island_num
     ALT_SCALE = 200
     WATER_LEVEL = 0.1
 
-    gradient_weight = 2.5
+    gradient_weight = 3.5
     voronoi_weight = 4.0
     noise_weight = 4.0
+    weight_sum = sum((gradient_weight, voronoi_weight, noise_weight))
 
     grad = Gradient(w, h)
-    noise = Noise(w, h)
+    noise = Noise(w, h, SEED)
     smooth = Smooth(w, h, 9)
     voro = Voronoi(w, h, 25, 15)
 
@@ -35,7 +36,7 @@ def test_new_pipeline():
         n = height_from_noise(pt)
         return (g + n) / 2.0
 
-    def height_from_weighted(pt, gw=3.0, nw=2.0):
+    def height_from_weighted(pt, gw=2.0, nw=2.0):
         g = height_from_gradient(pt) * gw
         n = height_from_noise(pt) * nw
         return (g + n) / (gw + nw)
@@ -52,16 +53,16 @@ def test_new_pipeline():
             g = grad.do_filter_at(x, y) * gradient_weight
             n = noise.do_filter_at(x, y) * noise_weight
             v = smoothed_plataeus[x, y] * voronoi_weight
-            z = (n + v + g) * g + WATER_LEVEL
+            z = ((n + v + g)/weight_sum) * g - WATER_LEVEL
             z = max(z, 0)
             zs[x, y] = z
 
     arr = utils.scale_to_bounds(zs, 0.0, 255.0).astype(np.int32)
     im = Image.fromarray(arr)
     arr = utils.scale_to_bounds(zs, 0.0, ALT_SCALE).astype(np.int32)
-    altitude.save_all_layers(arr, w, h, 55)
+    altitude.save_all_layers(arr, w, h, island_num)
     im.show()
 
 
 if __name__ == '__main__':
-    test_new_pipeline()
+    test_new_pipeline(80)

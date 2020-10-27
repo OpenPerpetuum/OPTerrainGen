@@ -19,9 +19,9 @@ class Gradient(CachedFilter):
         return utils.scale_to_bounds(arr)
 
     def generate_value_at(self, x, y):
-        sq_grad = utils.square_gradient(x, y, self.w, self.h)
+        sq_grad = utils.square_gradient(x, y, self.w, self.h) * 0.75
         cir_grad = utils.circular_gradient(x, y, self.w, self.h)
-        grad = sq_grad * cir_grad
+        grad = (sq_grad + cir_grad) / 2.0
         sin = math.sin(-utils.half_pi + grad * utils.half_pi) / 2.0 + 0.5
         power = pow(grad, 0.5)
         return (power + sin) / 2.0

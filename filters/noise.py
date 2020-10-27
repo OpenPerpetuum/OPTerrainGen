@@ -1,12 +1,10 @@
 from filters.filter import CachedFilter
 from opensimplex import OpenSimplex
 
-SEED = 5
-
 
 class Noise(CachedFilter):
 
-    def __init__(self, w, h):
+    def __init__(self, w, h, SEED=3):
         self.plex = OpenSimplex(seed=SEED)
         self.scales = (200., 125., 75., 45., 35., 25., 15., 7., 3., 1.)
         self.weights = (200., 150., 100., 50., 25., 15., 7., 3., 2., 1.)
